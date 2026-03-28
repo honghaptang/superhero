@@ -1,61 +1,41 @@
 #!/bin/bash
 
-# Random Commit Generator - Simulates Git Activity
-# Usage: ./random_commits.sh [max_commits] [commit_message_prefix]
-#        Defaults to 100 max commits with "Update" prefix
+# GitHub Activity Generator - Superhero Edition
+# Creates random commits in THIS repo to make your contribution graph look active
 
-set -e  # Exit on any error
+COMMITS_PER_DAY="${COMMITS_PER_DAY:-5}"
+DAYS_BACK="${DAYS_BACK:-365}"
 
-# Configuration
-MAX_COMMITS=${1:-100}  # Default max commits: 100
-if [[ $MAX_COMMITS -lt 1 || $MAX_COMMITS -gt 100 ]]; then
-    echo "Error: Max commits must be between 1-100" >&2
-    exit 1
-fi
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m'
 
-MSG_PREFIX=${2:-"Update"}  # Default commit message prefix
-TEMP_FILE=".activity_simulator.tmp"
-REPO_ROOT=$(git rev-parse --show-toplevel 2>/dev/null)
+echo -e "${GREEN}Superhero Activity Generator${NC}"
+echo "Generating $COMMITS_PER_DAY commits/day for $DAYS_BACK days..."
 
-# Verify we're in a git repository
-if [[ -z "$REPO_ROOT" ]]; then
-    echo "Error: Not in a git repository!" >&2
-    exit 1
-fi
-
-# Verify working directory is clean
-if ! git diff-index --quiet HEAD --; then
-    echo "Error: Uncommitted changes detected! Please commit/stash first." >&2
-    exit 1
-fi
-
-# Generate random commit count (1 to MAX_COMMITS)
-COMMIT_COUNT=$((RANDOM % MAX_COMMITS + 1))
-echo "Generating $COMMIT_COUNT random commits..."
-
-# Create temporary file in repo root
-TEMP_PATH="$REPO_ROOT/$TEMP_FILE"
-touch "$TEMP_PATH"
-
-# Generate commits
-for ((i=1; i<=COMMIT_COUNT; i++)); do
-    # Modify temporary file (changes content each time)
-    echo "$(date): Random activity #$i" > "$TEMP_PATH"
+for ((day=DAYS_BACK; day>=0; day--)); do
+    num_commits=$((RANDOM % (COMMITS_PER_DAY + 1)))
     
-    # Stage changes
-    git add "$TEMP_FILE"
-    
-    # Create commit with random message
-    COMMIT_MSG="$MSG_PREFIX $(date '+%Y-%m-%d %H:%M:%S') #$i"
-    git commit -m "$COMMIT_MSG" --quiet
-    
-    # Optional: Add small delay to avoid timestamp collisions
-    sleep 0.1
+    if [ $num_commits -gt 0 ]; then
+        commit_date=$(date -d "$day days ago" +%Y-%m-%d)
+        
+        for ((c=0; c<num_commits; c++)); do
+            hour=$((RANDOM % 24))
+            minute=$((RANDOM % 60))
+            second=$((RANDOM % 60))
+            
+            git_date="$commit_date $hour:$minute:$second"
+            export GIT_AUTHOR_DATE="$git_date"
+            export GIT_COMMITTER_DATE="$git_date"
+            
+            filename="hero_$((RANDOM % 50)).json"
+            echo "{\"power\": $RANDOM, \"date\": \"$git_date\"}" > "$filename"
+            
+            git add "$filename"
+            git commit -m "🦸 $git_date" > /dev/null 2>&1
+            echo -e "${GREEN}[+]${NC} $git_date"
+        done
+    fi
 done
 
-# Clean up temporary file
-git rm --quiet "$TEMP_FILE"
-git commit -m "Cleanup activity simulation" --quiet
-
-echo "Done! Generated $COMMIT_COUNT commits."
-echo "Tip: Use 'git log --oneline -n $((COMMIT_COUNT+1))' to verify"
+echo -e "\n${YELLOW}Done! Push with: git push -u origin main --force${NC}"
